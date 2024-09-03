@@ -4,13 +4,13 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 from rdkit.Chem.AllChem import GetMorganFingerprintAsBitVect
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, r2_score
 
 # 指定包含 JSON 文件的本地文件夹路径
-folder_path = 'C:\\Users\\windows\\OneDrive\\Desktop\\ordjson'
+folder_path = 'C:\\Users\\35078\\OneDrive\\文档\\GitHub\\ordjson'
 
 # 初始化一个空的列表来存储数据
 data_list = []
@@ -19,6 +19,7 @@ data_list = []
 for filename in os.listdir(folder_path):
     if filename.endswith('.json'):
         file_path = os.path.join(folder_path, filename)
+        print(f"Processing file: {file_path}")  # 调试信息
 
         # 读取 JSON 文件
         with open(file_path, 'r') as file:
@@ -68,6 +69,12 @@ for filename in os.listdir(folder_path):
                 else:
                     print(f"Invalid SMILES: {smiles}")
 
+# 检查数据列表是否为空
+if not data_list:
+    print("No data loaded. Please check the JSON files and folder path.")
+else:
+    print(f"Loaded {len(data_list)} records.")
+
 # 将数据转换为 pandas 数据框
 df = pd.DataFrame(data_list)
 
@@ -93,19 +100,29 @@ scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-# 初始化并训练支持向量回归模型
-svr_classifier = SVR(kernel='linear')
-svr_classifier.fit(X_train, y_train)
+# 定义参数网格
+param_grid = {
+    'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
+    'C': [0.1, 1, 10, 100],
+    'gamma': ['scale', 'auto']
+}
+
+# 使用网格搜索进行超参数调优
+grid_search = GridSearchCV(SVR(), param_grid, cv=5, scoring='r2')
+grid_search.fit(X_train, y_train)
+
+# 输出最佳参数
+print(f"Best parameters: {grid_search.best_params_}")
+
+# 使用最佳参数训练模型
+best_svr = grid_search.best_estimator_
+best_svr.fit(X_train, y_train)
 
 # 预测测试集
-y_pred = svr_classifier.predict(X_test)
+y_pred = best_svr.predict(X_test)
 
 # 评估模型性能
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 print(f'Mean Squared Error: {mse}')
 print(f'R² Score: {r2}')
-'''
-Mean Squared Error: 878.8717817619925
-R² Score: -0.02738986664197629
-'''
